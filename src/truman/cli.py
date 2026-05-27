@@ -20,6 +20,10 @@ def _cmd_run(args: argparse.Namespace) -> int:
     goal = load_goal(args.goal)
     if args.max_iterations is not None:
         goal.max_iterations = args.max_iterations
+    if args.persona_count is not None:
+        goal.persona_count = args.persona_count
+    if args.threshold is not None:
+        goal.threshold = args.threshold
     mode = "llm" if args.llm else "mock"
     engine = TrumanEngine(goal, mode=mode, model=args.model)
     result = engine.run_sync()
@@ -45,6 +49,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_run.add_argument("--llm", action="store_true", help="Use real LLM providers (default: offline mock)")
     p_run.add_argument("--model", default=None, help="LiteLLM model id (default: anthropic Claude)")
     p_run.add_argument("--max-iterations", type=int, default=None, dest="max_iterations")
+    p_run.add_argument("--persona-count", type=int, default=None, dest="persona_count")
+    p_run.add_argument("--threshold", type=float, default=None, help="Override the success threshold")
     p_run.set_defaults(func=_cmd_run)
 
     p_val = sub.add_parser("validate", help="Validate a goal config")

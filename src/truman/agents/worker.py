@@ -13,17 +13,23 @@ class LLMWorker:
     def __init__(self, model: str | None = None) -> None:
         self._model = model
 
+    _SYSTEM = (
+        "You are a sharp direct-response copywriter. Output ONLY the headline text — one short, "
+        "punchy line under ~90 characters. No keyword-stuffing, no lists, no quotes, no preamble."
+    )
+
     def _gen(self, instruction: str, plan: str) -> str:
         text = complete(
             [
-                {"role": "system", "content": "You are a sharp copywriter. Output ONLY the artifact text, one line."},
+                {"role": "system", "content": self._SYSTEM},
                 {"role": "user", "content": f"{plan}\n\n{instruction}"},
             ],
             model=self._model,
             temperature=0.8,
-            max_tokens=120,
+            max_tokens=80,
         )
-        return text.strip().splitlines()[0].strip() if text.strip() else text.strip()
+        line = text.strip().splitlines()[0].strip() if text.strip() else ""
+        return line.strip('"').strip()
 
     def create(self, goal: GoalConfig, brief: ResearchBrief, plan: str) -> CandidateArtifact:
         instruction = f"Write a first {goal.artifact_kind} for: {goal.goal}"

@@ -58,11 +58,24 @@ Offline (deterministic, no network — the runnable MVP slice):
 python -m truman run examples/headline_engagement.yaml
 ```
 
-With real LLMs (LiteLLM, default Anthropic Claude; needs API keys):
+With real LLMs (Anthropic SDK; default Anthropic Claude). Provide credentials via env —
+either an OAuth bearer token or an API key:
 
 ```bash
-python -m truman run examples/headline_engagement.yaml --llm --model anthropic/claude-sonnet-4-5
+export ANTHROPIC_OAUTH_TOKEN=...   # Claude OAuth token (sent with the oauth beta header)
+# or: export ANTHROPIC_API_KEY=...
+
+python -m truman run examples/headline_engagement.yaml --llm \
+    --model claude-haiku-4-5-20251001 --persona-count 5 --threshold 0.55
 ```
+
+In `--llm` mode every layer is real: personas are LLM-generated (target audience),
+each persona decides whether to engage via its own LLM call, the in-simulation
+**DM judge** rates each reaction 0–10, and the worker rewrites the artifact from the
+judge's feedback. The loop iterates until the composite score beats the threshold,
+e.g. `0.46 → 0.488 → 0.632 (delivered)`.
+
+Run flags: `--llm`, `--model`, `--max-iterations`, `--persona-count`, `--threshold`.
 
 Validate a goal config:
 

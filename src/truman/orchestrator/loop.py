@@ -29,8 +29,8 @@ from truman.judge.verdict import JudgeVerdict
 from truman.orchestrator.ledger import IterationRecord, Ledger
 from truman.research.base import ResearchBrief
 from truman.research.mock_researcher import MockResearcher
-from truman.sim.driver import SimulationRunner
-from truman.sim.personas import Persona, build_personas
+from truman.sim.driver import LLMPersonaDecider, PersonaDecider, SimulationRunner
+from truman.sim.personas import Persona, build_personas, build_personas_llm
 
 
 @dataclass
@@ -57,12 +57,14 @@ class TrumanEngine:
 
             self._researcher = LLMResearcher(model)
             self._worker = LLMWorker(model)
+            decider = LLMPersonaDecider(model)
         else:
             self._researcher = MockResearcher()
             self._worker = MockWorker()
+            decider = PersonaDecider()
         self._planner = Planner()
         self._scorer = EngagementScorer()
-        self._runner = SimulationRunner(build_reaction_dm(mode, model))
+        self._runner = SimulationRunner(build_reaction_dm(mode, model), decider=decider)
 
     def run_sync(self) -> RunResult:
         return asyncio.run(self.run())
@@ -71,7 +73,10 @@ class TrumanEngine:
         goal = self.goal
         brief = self._researcher.research(goal)
         plan = self._planner.plan(goal, brief)
-        personas = build_personas(goal.scene.get("topic"), goal.persona_count, goal.seed)
+        if self.mode == "llm":
+            personas = build_personas_llm(goal, goal.persona_count, self.model)
+        else:
+            personas = build_personas(goal.scene.get("topic"), goal.persona_count, goal.seed)
 
         ledger = Ledger()
         artifact = self._worker.create(goal, brief, plan)

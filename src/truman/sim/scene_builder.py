@@ -53,13 +53,14 @@ def build_scene_config(goal: GoalConfig, artifact: CandidateArtifact) -> SceneCo
                 "description": "React to the headline shown in the feed.",
                 "params": [
                     {"name": "sentiment", "type": "free_text", "required": True},
-                    {"name": "intensity", "type": "number", "required": True},
+                    {"name": "intensity", "type": "number", "required": False},
                 ],
                 "dm": {
                     "hint": (
-                        "The reacting persona engaged with the content. Increment "
-                        "artifact.engagement_score by the action's `intensity` value, "
-                        "and emit a 'reaction' event summarizing the sentiment."
+                        "An audience member reacted to the content. If the action carries "
+                        "an `intensity` parameter, increment artifact.engagement_score by it. "
+                        "Otherwise judge how strongly they engaged on a 0-10 scale from their "
+                        "reaction sentiment and increment by that amount. Emit a 'reaction' event."
                     ),
                     "allowed_ops": ["increment", "emit_event"],
                     "max_effects": 3,

@@ -77,6 +77,79 @@ class Persona:
         }
 
 
+def build_personas_llm(goal: Any, count: int, model: str | None = None) -> list[Persona]:
+    """Generate diverse personas with a real LLM (MiroFish-style profiling).
+
+    Falls back to the deterministic generator if the LLM output can't be parsed
+    or there are too few personas.
+    """
+    import json
+
+    from truman.llm.runtime import complete, extract_json
+
+    primary = goal.scene.get("topic") if isinstance(getattr(goal, "scene", None), dict) else None
+    prompt = (
+        f"Generate {count} personas representing the TARGET audience for this goal — "
+        "people plausibly in-market for the product, not the random hostile public:\n"
+        f"Goal: {goal.goal}\n"
+        f"Topic/context: {json.dumps(getattr(goal, 'scene', {}))}\n\n"
+        f"Return ONLY a JSON array of {count} objects. Each object has keys: "
+        "name, bio, persona (2-3 sentences), mbti, country, profession, "
+        "interested_topics (array of 2 short lowercase keywords relevant to the product), "
+        "stance (one of: enthusiast, skeptic, neutral), "
+        "sentiment_bias (number from -1 to 1), influence_weight (number from 0.5 to 2). "
+        "Vary them in enthusiasm, demographics, and exactly what would hook them: include a mix "
+        "of easy-to-win and hard-to-win members, but most should be genuinely interested in the category."
+    )
+    try:
+        text = complete(
+            [
+                {"role": "system", "content": "You are an audience-research expert. Output strict JSON only."},
+                {"role": "user", "content": prompt},
+            ],
+            model=model,
+            temperature=0.9,
+            max_tokens=1600,
+        )
+        data = extract_json(text)
+    except Exception:
+        data = None
+
+    if not isinstance(data, list) or not data:
+        return build_personas(primary, count, getattr(goal, "seed", 0))
+
+    personas: list[Persona] = []
+    for i, d in enumerate(data[:count]):
+        if not isinstance(d, dict):
+            continue
+        topics = [str(t).lower() for t in (d.get("interested_topics") or [])][:3] or ["general"]
+        personas.append(
+            Persona(
+                agent_id=f"persona_{i + 1}",
+                name=str(d.get("name", f"persona_{i + 1}")),
+                bio=str(d.get("bio", "")),
+                persona=str(d.get("persona", "")),
+                mbti=str(d.get("mbti", "")),
+                country=str(d.get("country", "")),
+                profession=str(d.get("profession", "")),
+                interested_topics=topics,
+                stance=str(d.get("stance", "neutral")),
+                sentiment_bias=_as_float(d.get("sentiment_bias"), 0.0),
+                influence_weight=_as_float(d.get("influence_weight"), 1.0),
+            )
+        )
+    if len(personas) < count:
+        personas += build_personas(primary, count - len(personas), getattr(goal, "seed", 0) + len(personas))
+    return personas[:count]
+
+
+def _as_float(v: Any, default: float) -> float:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return default
+
+
 def build_personas(primary_topic: str | None, count: int, seed: int) -> list[Persona]:
     """Deterministically generate `count` personas from a seed (offline/mock)."""
     pool = topic_pool(primary_topic, size=6)
