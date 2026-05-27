@@ -1,0 +1,19 @@
+# Truman demo goal: maximize simulated audience engagement of a headline.
+# Run offline:  python -m truman run examples/headline_engagement.yaml
+# Run with LLM: python -m truman run examples/headline_engagement.yaml --llm
+
+goal: "Write a headline that maximizes audience engagement for our new budget travel app."
+artifact_kind: text_headline
+threshold: 0.65
+max_iterations: 6
+persona_count: 6
+ticks_per_sim: 3
+seed: 42
+
+criteria:
+  - { name: engagement, metric: avg_engagement, weight: 0.7 }
+  - { name: reach,      metric: positive_ratio, weight: 0.3 }
+
+scene:
+  topic: "budget travel"
+  platform: "social_feed"
