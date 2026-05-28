@@ -26,6 +26,7 @@ class GoalConfig(BaseModel):
     """A complete goal specification loaded from YAML."""
 
     goal: str
+    vertical: str = "headline"
     artifact_kind: str = "text_headline"
     criteria: list[SuccessCriterion] = Field(min_length=1)
     threshold: float = 0.7

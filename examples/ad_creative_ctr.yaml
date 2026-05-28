@@ -1,0 +1,27 @@
+# AI ad-creative evolution: optimize a short-form video ad for CTR/ROAS.
+# Offline:  python -m truman run examples/ad_creative_ctr.yaml
+# With LLM: python -m truman run examples/ad_creative_ctr.yaml --llm --persona-count 5
+
+goal: "Maximize CTR / ROAS / conversion for our new budget travel app's short-form video ad."
+vertical: ad_creative
+artifact_kind: ad_creative
+threshold: 0.55
+max_iterations: 6
+persona_count: 6
+seed: 42
+
+criteria:
+  - { name: ctr,       metric: ctr,             weight: 0.4 }
+  - { name: dwell,     metric: avg_dwell,       weight: 0.2 }
+  - { name: sentiment, metric: sentiment_ratio, weight: 0.2 }
+  - { name: roas,      metric: roas_proxy,      weight: 0.2 }
+
+scene:
+  product: "budget travel"
+  platform: "tiktok"
+  audience_segments:
+    - 小红书用户
+    - TikTok用户
+    - 美国宝妈
+    - Web3 Degens
+    - GenZ

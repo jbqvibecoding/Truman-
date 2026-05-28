@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
@@ -20,6 +20,9 @@ class CandidateArtifact:
     content: str
     rationale: str = ""
     parent_iteration: int | None = None
+    # Structured artifact payload for richer verticals (e.g. ad creative:
+    # title/hook/script/storyboard). `content` stays a rendered summary string.
+    fields: dict = field(default_factory=dict)
 
 
 @runtime_checkable

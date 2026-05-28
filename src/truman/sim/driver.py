@@ -33,14 +33,14 @@ class LLMPersonaDecider:
         self._model = model
         self._fallback = PersonaDecider()
 
-    def decide(self, persona: Persona, headline: str) -> dict:
+    def decide(self, persona: Persona, artifact: CandidateArtifact) -> dict:
         from truman.llm.runtime import complete, extract_json
 
         system = "You role-play a social-media user deciding whether to engage with a post. Output strict JSON only."
         user = (
             f"You are this person:\n{persona.persona}\n"
             f"Interests: {', '.join(persona.interested_topics)}. Stance: {persona.stance}.\n\n"
-            f'You scroll past and see this headline: "{headline}"\n\n'
+            f'You scroll past and see this content: "{artifact.content}"\n\n'
             "Will you engage (like/comment/share) or scroll past? Be honest to your persona.\n"
             'Return JSON: {"engage": true or false, "sentiment": "<one short phrase of your reaction>"}'
         )
@@ -55,7 +55,7 @@ class LLMPersonaDecider:
             engage = bool(data.get("engage", False))
             sentiment = str(data.get("sentiment", "")).strip() or ("interested" if engage else "not interested")
         except Exception:
-            return self._fallback.decide(persona, headline)
+            return self._fallback.decide(persona, artifact)
         if engage:
             return {"action": "react", "params": {"sentiment": sentiment}, "intensity": None, "engaged": True}
         return {"action": "scroll_past", "params": {}, "intensity": 0.0, "engaged": False}
@@ -64,8 +64,8 @@ class LLMPersonaDecider:
 class PersonaDecider:
     """Deterministic engagement model used in offline/mock mode."""
 
-    def intensity(self, persona: Persona, headline: str) -> float:
-        h = headline.lower()
+    def intensity(self, persona: Persona, artifact: CandidateArtifact) -> float:
+        h = artifact.content.lower()
         topics = persona.interested_topics or []
         matched = sum(1 for t in topics if t.lower() in h)
         topic_score = matched / len(topics) if topics else 0.0
@@ -73,8 +73,8 @@ class PersonaDecider:
         raw = 0.3 * bias_score + 0.7 * topic_score
         return round(MAX_INTENSITY * raw, 3)
 
-    def decide(self, persona: Persona, headline: str) -> dict:
-        score = self.intensity(persona, headline)
+    def decide(self, persona: Persona, artifact: CandidateArtifact) -> dict:
+        score = self.intensity(persona, artifact)
         if score >= ENGAGE_CUTOFF:
             return {
                 "action": "react",
@@ -86,9 +86,24 @@ class PersonaDecider:
 
 
 class SimulationRunner:
-    def __init__(self, dm_provider, decider: PersonaDecider | None = None) -> None:
+    """Vertical-agnostic simulation driver.
+
+    The scene construction and metric computation are injected by the active
+    vertical (`scene_builder`, `metrics_fn`); they default to the headline
+    engagement behaviour so existing callers keep working.
+    """
+
+    def __init__(
+        self,
+        dm_provider,
+        decider=None,
+        scene_builder=None,
+        metrics_fn=None,
+    ) -> None:
         self._dm = dm_provider
         self._decider = decider or PersonaDecider()
+        self._scene_builder = scene_builder or build_scene_config
+        self._metrics_fn = metrics_fn or self._default_metrics
 
     async def run(
         self,
@@ -96,7 +111,7 @@ class SimulationRunner:
         artifact: CandidateArtifact,
         personas: list[Persona],
     ) -> SimulationResult:
-        scene = build_scene_config(goal, artifact)
+        scene = self._scene_builder(goal, artifact)
         engine = WorldEngine(config=scene, dm_provider=self._dm)
 
         for p in personas:
@@ -104,7 +119,7 @@ class SimulationRunner:
 
         per_persona: dict[str, dict] = {}
         for p in personas:
-            decision = self._decider.decide(p, artifact.content)
+            decision = self._decider.decide(p, artifact)
             per_persona[p.agent_id] = {
                 "engaged": decision["engaged"],
                 "intensity": decision["intensity"],
@@ -116,28 +131,28 @@ class SimulationRunner:
         await engine.step_async()
 
         artifact_entity = engine.state.get("artifact")
-        engagement_state = float(artifact_entity.get("engagement_score")) if artifact_entity else 0.0
+        artifact_state = dict(artifact_entity.to_full_dict()) if artifact_entity else {}
         events = [e.to_dict() for e in engine.event_log.get_events(0)]
 
-        metrics = self._metrics(personas, per_persona, engagement_state)
+        metrics = self._metrics_fn(personas, per_persona, artifact_state, events)
         return SimulationResult(
             artifact=artifact,
             per_persona=per_persona,
             events=events,
             metrics=metrics,
-            engagement_score_state=engagement_state,
+            artifact_state=artifact_state,
         )
 
-    def _metrics(
-        self,
+    @staticmethod
+    def _default_metrics(
         personas: list[Persona],
         per_persona: dict[str, dict],
-        engagement_state: float,
+        artifact_state: dict,
+        events: list[dict],
     ) -> dict[str, float]:
+        """Headline engagement metrics (default vertical)."""
         n = len(personas) or 1
-        # avg_engagement uses the authoritative aggregate the DM wrote to world
-        # state (sum of per-reaction increments), normalized. Works for both the
-        # deterministic mock DM and the real LLM DM.
+        engagement_state = float(artifact_state.get("engagement_score", 0.0) or 0.0)
         avg_engagement = engagement_state / (n * MAX_INTENSITY)
         engaged = [p for p in personas if per_persona[p.agent_id]["engaged"]]
         positive_ratio = len(engaged) / n

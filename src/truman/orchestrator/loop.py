@@ -20,17 +20,15 @@ import asyncio
 from dataclasses import dataclass, field
 
 from truman.agents.base import CandidateArtifact
-from truman.agents.mock_worker import MockWorker
 from truman.agents.planner import Planner
 from truman.goal.schema import GoalConfig
-from truman.judge.reaction_dm import build_reaction_dm
 from truman.judge.scorer import EngagementScorer
 from truman.judge.verdict import JudgeVerdict
 from truman.orchestrator.ledger import IterationRecord, Ledger
 from truman.research.base import ResearchBrief
-from truman.research.mock_researcher import MockResearcher
-from truman.sim.driver import LLMPersonaDecider, PersonaDecider, SimulationRunner
-from truman.sim.personas import Persona, build_personas, build_personas_llm
+from truman.sim.driver import SimulationRunner
+from truman.sim.personas import Persona
+from truman.verticals.registry import get_vertical
 
 
 @dataclass
@@ -51,20 +49,17 @@ class TrumanEngine:
         self.goal = goal
         self.mode = mode
         self.model = model
-        if mode == "llm":
-            from truman.agents.worker import LLMWorker
-            from truman.research.llm_researcher import LLMResearcher
-
-            self._researcher = LLMResearcher(model)
-            self._worker = LLMWorker(model)
-            decider = LLMPersonaDecider(model)
-        else:
-            self._researcher = MockResearcher()
-            self._worker = MockWorker()
-            decider = PersonaDecider()
+        self._vertical = get_vertical(goal.vertical)
+        self._researcher = self._vertical.make_research(mode, model)
+        self._worker = self._vertical.make_creative(mode, model)
         self._planner = Planner()
         self._scorer = EngagementScorer()
-        self._runner = SimulationRunner(build_reaction_dm(mode, model), decider=decider)
+        self._runner = SimulationRunner(
+            self._vertical.make_dm(mode, model),
+            decider=self._vertical.make_decider(mode, model),
+            scene_builder=self._vertical.build_scene,
+            metrics_fn=self._vertical.compute_metrics,
+        )
 
     def run_sync(self) -> RunResult:
         return asyncio.run(self.run())
@@ -73,10 +68,7 @@ class TrumanEngine:
         goal = self.goal
         brief = self._researcher.research(goal)
         plan = self._planner.plan(goal, brief)
-        if self.mode == "llm":
-            personas = build_personas_llm(goal, goal.persona_count, self.model)
-        else:
-            personas = build_personas(goal.scene.get("topic"), goal.persona_count, goal.seed)
+        personas = self._vertical.make_personas(goal, self.mode, self.model)
 
         ledger = Ledger()
         artifact = self._worker.create(goal, brief, plan)

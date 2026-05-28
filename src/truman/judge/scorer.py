@@ -25,7 +25,7 @@ class EngagementScorer:
         composite = round(weighted_sum / goal.total_weight, 4)
         threshold_met = composite >= goal.threshold
 
-        weaknesses = self._weaknesses(result)
+        weaknesses = self._weaknesses(goal, result, per_criterion)
         feedback = self._feedback(goal, result, composite, threshold_met, weaknesses)
         return JudgeVerdict(
             score=composite,
@@ -36,13 +36,21 @@ class EngagementScorer:
             weaknesses=weaknesses,
         )
 
-    def _weaknesses(self, result: SimulationResult) -> list[str]:
-        unengaged = [aid for aid, pp in result.per_persona.items() if not pp["engaged"]]
+    def _weaknesses(
+        self,
+        goal: GoalConfig,
+        result: SimulationResult,
+        per_criterion: dict[str, float],
+    ) -> list[str]:
+        """Vertical-agnostic: unengaged audience + the weakest criterion vs threshold."""
         out: list[str] = []
+        unengaged = [aid for aid, pp in result.per_persona.items() if not pp["engaged"]]
         if unengaged:
             out.append(f"{len(unengaged)} persona(s) did not engage: {', '.join(sorted(unengaged))}.")
-        if result.metrics.get("avg_engagement", 0.0) < 0.5:
-            out.append("Average engagement is low — the hook is not compelling enough.")
+        below = {name: v for name, v in per_criterion.items() if v < goal.threshold}
+        if below:
+            worst = min(below, key=below.get)
+            out.append(f"Weakest metric '{worst}' = {below[worst]} (below threshold {goal.threshold}).")
         return out
 
     def _feedback(
