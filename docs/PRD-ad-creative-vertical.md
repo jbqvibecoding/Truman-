@@ -1,6 +1,8 @@
 # PRD — AI 广告创意进化系统 (AdCreativeVertical)
 
-> 文档版本 v1.0 · 状态: 已实现 · 模块路径 `src/truman/verticals/ad_creative.py` ·
+> **see also**: [`docs/PRD.md`](./PRD.md) — Truman 平台级 PRD v2.0 (本文档是平台所支持的诸多 vertical 之一)
+>
+> 文档版本 v1.0 (vertical 级, 保留作历史基线 + 实现细节参考) · 状态: 已实现 · 模块路径 `src/truman/verticals/ad_creative.py` ·
 > 上游框架 Truman Goal-Driven Recursive AI System
 
 ## 1. 背景 (Why)
