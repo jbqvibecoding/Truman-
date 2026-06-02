@@ -35,6 +35,12 @@ class HeadlineVertical:
         return MockWorker()
 
     def make_personas(self, goal: GoalConfig, mode: str, model: str | None) -> list[Persona]:
+        from truman.personas.library import build_personas_for_scene
+
+        # New (M3): if the goal specifies a cohort or persona upload, use it.
+        cohort_personas = build_personas_for_scene(goal.scene or {}, goal.persona_count, goal.seed)
+        if cohort_personas:
+            return cohort_personas
         if mode == "llm":
             return build_personas_llm(goal, goal.persona_count, model)
         return build_personas(goal.scene.get("topic"), goal.persona_count, goal.seed)
