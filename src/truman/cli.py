@@ -40,7 +40,53 @@ def _cmd_run(args: argparse.Namespace) -> int:
     print(f"Per-criterion: {v.per_criterion}")
     print(f"\nDelivered artifact (iteration {result.final_artifact.iteration}):")
     print(f"  {result.final_artifact.content}")
+
+    # M4: emit Evolution Changelog if requested
+    if args.changelog_out:
+        from truman.changelog import ChangelogView, export
+
+        view = ChangelogView.from_run(goal, result.ledger, result.artifact_history)
+        out = export(view, args.changelog_format, args.changelog_out)
+        print(f"\nChangelog written: {out}")
+
     return 0 if result.delivered else 1
+
+
+def _cmd_changelog(args: argparse.Namespace) -> int:
+    """Render the Evolution Changelog for a fresh run of a goal config.
+
+    For now, this re-runs the goal in mock mode and then renders the changelog
+    in the requested format. (Persisting / loading RunResult to disk is a
+    future enhancement; the in-memory pipeline is already exposed via the
+    `--changelog-out` flag on `run`.)
+    """
+    from truman.changelog import ChangelogView, export, render_summary
+
+    goal = load_goal(args.goal)
+    engine = TrumanEngine(goal, mode="llm" if args.llm else "mock", model=args.model)
+    result = engine.run_sync()
+    view = ChangelogView.from_run(goal, result.ledger, result.artifact_history)
+
+    if args.out:
+        path = export(view, args.format, args.out)
+        print(f"Changelog written: {path}")
+        return 0
+    # Default behaviour: print the requested format to stdout.
+    if args.format == "summary":
+        print(render_summary(view))
+    elif args.format in ("md", "markdown"):
+        from truman.changelog import render_markdown
+        print(render_markdown(view))
+    elif args.format == "html":
+        from truman.changelog import render_html
+        print(render_html(view))
+    elif args.format == "json":
+        from truman.changelog.exporter import _view_to_dict
+        print(json.dumps(_view_to_dict(view), ensure_ascii=False, indent=2))
+    else:
+        print(f"Unknown format: {args.format}", file=sys.stderr)
+        return 2
+    return 0
 
 
 def _cmd_recommend(args: argparse.Namespace) -> int:
@@ -81,6 +127,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_run.add_argument("--threshold", type=float, default=None, help="Override the success threshold")
     p_run.add_argument("--budget-tokens", type=int, default=None, dest="budget_tokens",
                        help="Stop the loop once cumulative LLM cost reaches this many tokens")
+    p_run.add_argument("--changelog-out", default=None, dest="changelog_out",
+                       help="Path to write the Evolution Changelog (M4)")
+    p_run.add_argument("--changelog-format", default="md", dest="changelog_format",
+                       choices=["md", "markdown", "summary", "html", "json"],
+                       help="Format for --changelog-out (default: md)")
     p_run.set_defaults(func=_cmd_run)
 
     p_val = sub.add_parser("validate", help="Validate a goal config")
@@ -94,6 +145,17 @@ def build_parser() -> argparse.ArgumentParser:
                        help="Use the LLM recommender (default: deterministic mock)")
     p_rec.add_argument("--model", default=None, help="LiteLLM model id (LLM mode only)")
     p_rec.set_defaults(func=_cmd_recommend)
+
+    p_cl = sub.add_parser("changelog",
+                          help="Run a goal and render the Evolution Changelog (M4)")
+    p_cl.add_argument("goal", help="Path to a goal YAML file")
+    p_cl.add_argument("--format", default="md",
+                      choices=["md", "markdown", "summary", "html", "json"],
+                      help="Output format (default: md)")
+    p_cl.add_argument("--out", default=None, help="Write to this path instead of stdout")
+    p_cl.add_argument("--llm", action="store_true", help="Use real LLM providers")
+    p_cl.add_argument("--model", default=None, help="LiteLLM model id")
+    p_cl.set_defaults(func=_cmd_changelog)
     return parser
 
 

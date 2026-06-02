@@ -39,6 +39,9 @@ class RunResult:
     final_verdict: JudgeVerdict
     brief: ResearchBrief
     personas: list[Persona] = field(default_factory=list)
+    # M4: full per-iteration artifact history (parallel to ledger.records) so
+    # the Evolution Changelog renderer can show field-level diffs.
+    artifact_history: list[CandidateArtifact] = field(default_factory=list)
 
     @property
     def delivered(self) -> bool:
@@ -97,6 +100,7 @@ class TrumanEngine:
 
         ledger = Ledger()
         artifact = self._worker.create(goal, brief, plan)
+        artifact_history: list[CandidateArtifact] = [artifact]
         verdict: JudgeVerdict | None = None
         best = -1.0
 
@@ -138,6 +142,7 @@ class TrumanEngine:
             if _budget_exhausted(goal, ledger) or _plateau_hit(goal, ledger):
                 break
             artifact = self._worker.revise(goal, brief, plan, artifact, verdict)
+            artifact_history.append(artifact)
 
         assert verdict is not None  # max_iterations >= 1 guaranteed by schema
         return RunResult(
@@ -146,4 +151,5 @@ class TrumanEngine:
             final_verdict=verdict,
             brief=brief,
             personas=personas,
+            artifact_history=artifact_history,
         )
