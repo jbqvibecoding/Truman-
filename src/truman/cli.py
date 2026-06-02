@@ -52,6 +52,80 @@ def _cmd_run(args: argparse.Namespace) -> int:
     return 0 if result.delivered else 1
 
 
+def _cmd_record_kpi(args: argparse.Namespace) -> int:
+    """Append a real-KPI datapoint for a previously-delivered run (M7)."""
+    from truman.feedback import record_real_kpi
+
+    sim = _parse_kv_metrics(args.sim or [])
+    real = _parse_kv_metrics(args.real or [])
+    if not real:
+        print("error: at least one --real metric=value is required", file=sys.stderr)
+        return 2
+    path = record_real_kpi(args.run_id, sim, real, path=args.path)
+    print(f"Recorded: {path}")
+    return 0
+
+
+def _cmd_calibrate(args: argparse.Namespace) -> int:
+    """Print Pearson r per metric + tuning suggestions from recorded KPIs (M7)."""
+    from truman.feedback import calibration_report
+    from truman.feedback.recorder import load_history
+
+    history = load_history(args.path)
+    report = calibration_report(history)
+    print(json.dumps({
+        "n_samples": report.n_samples,
+        "confidence": report.confidence,
+        "per_metric_pearson_r": report.per_metric_pearson_r,
+        "suggestions": report.suggestions,
+    }, ensure_ascii=False, indent=2))
+    return 0
+
+
+def _cmd_deploy(args: argparse.Namespace) -> int:
+    """Export a delivered run to a target adapter (M8). Dry-run by default."""
+    from truman.deploy import available_targets, get_adapter
+
+    if args.target not in available_targets():
+        print(f"error: unknown target {args.target!r}. Available: {', '.join(available_targets())}",
+              file=sys.stderr)
+        return 2
+    goal = load_goal(args.goal)
+    engine = TrumanEngine(goal, mode="llm" if args.llm else "mock", model=args.model)
+    run = engine.run_sync()
+    adapter = get_adapter(args.target)
+    # Default behaviour is dry-run. --live overrides ONLY if the adapter
+    # reports itself as live-capable (so missing creds can't accidentally
+    # trigger a real call).
+    dry_run = True
+    if args.live:
+        if adapter.is_live():
+            dry_run = False
+        else:
+            print(f"warning: --live requested but adapter {args.target} not live-capable "
+                  "(missing credentials); falling back to dry-run.", file=sys.stderr)
+    result = adapter.export(run, goal, dry_run=dry_run)
+    print(json.dumps({
+        "target": result.target, "dry_run": result.dry_run,
+        "url_or_path": result.url_or_path, "payload_summary": result.payload_summary,
+        "error": result.error,
+    }, ensure_ascii=False, indent=2))
+    return 1 if result.error else 0
+
+
+def _parse_kv_metrics(items: list[str]) -> dict[str, float]:
+    out: dict[str, float] = {}
+    for item in items:
+        if "=" not in item:
+            continue
+        k, v = item.split("=", 1)
+        try:
+            out[k.strip()] = float(v.strip())
+        except ValueError:
+            continue
+    return out
+
+
 def _cmd_changelog(args: argparse.Namespace) -> int:
     """Render the Evolution Changelog for a fresh run of a goal config.
 
@@ -156,6 +230,32 @@ def build_parser() -> argparse.ArgumentParser:
     p_cl.add_argument("--llm", action="store_true", help="Use real LLM providers")
     p_cl.add_argument("--model", default=None, help="LiteLLM model id")
     p_cl.set_defaults(func=_cmd_changelog)
+
+    # M7: record real KPIs + run calibration
+    p_kpi = sub.add_parser("record-kpi", help="Record a real-world KPI for a delivered run (M7)")
+    p_kpi.add_argument("run_id", help="A user-supplied identifier for the run / artifact")
+    p_kpi.add_argument("--sim", action="append", default=[], help="sim metric, e.g. --sim ctr=0.38")
+    p_kpi.add_argument("--real", action="append", default=[], help="real metric, e.g. --real ctr=0.42")
+    p_kpi.add_argument("--path", default=None, help="Override TSV path (default: data/feedback.tsv)")
+    p_kpi.set_defaults(func=_cmd_record_kpi)
+
+    p_cal = sub.add_parser("calibrate", help="Pearson r per metric + tuning hints (M7)")
+    p_cal.add_argument("--path", default=None, help="TSV path (default: data/feedback.tsv)")
+    p_cal.set_defaults(func=_cmd_calibrate)
+
+    # M8: deploy adapters
+    p_dep = sub.add_parser("deploy", help="Export a delivered run to a target adapter (M8)")
+    p_dep.add_argument("goal", help="Path to a goal YAML file")
+    p_dep.add_argument("--target", required=True,
+                       choices=["local", "meta_ads", "github_pr", "notion"],
+                       help="Deployment target")
+    p_dep.add_argument("--live", action="store_true",
+                       help="Opt in to live mode (requires credentials; "
+                            "v1 still dry-runs meta_ads/github_pr/notion for safety)")
+    p_dep.add_argument("--llm", action="store_true")
+    p_dep.add_argument("--model", default=None)
+    p_dep.set_defaults(func=_cmd_deploy)
+
     return parser
 
 
