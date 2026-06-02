@@ -1,0 +1,20 @@
+# LandingPageVertical — first-screen conversion-optimized landing page (PRD §2 D).
+
+goal: "Optimize the landing page above-the-fold for an AI travel-planning app."
+vertical: landing_page
+artifact_kind: landing_page
+threshold: 0.55
+max_iterations: 6
+persona_count: 6
+seed: 11
+
+evals:
+  - {id: lp_cta_clear, prompt: "Is the CTA single-verb and unambiguous?", check_kind: regex,
+     config: {field: "fields.cta", require: [try, get, start, sign up, book, download]}, weight: 0.3}
+  - {id: lp_scroll, prompt: "Does scroll_depth clear 0.5?", check_kind: range,
+     config: {metric: scroll_depth, op: ">=", value: 0.5}, weight: 0.35}
+  - {id: lp_click, prompt: "Does cta_click_rate clear 0.4?", check_kind: range,
+     config: {metric: cta_click_rate, op: ">=", value: 0.4}, weight: 0.35}
+
+scene:
+  product: "AI travel planner"

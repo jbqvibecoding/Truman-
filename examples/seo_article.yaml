@@ -1,0 +1,22 @@
+# SEOVertical — long-form article matching search intent (PRD §2 D).
+
+goal: "Rank for the keyword 'best AI agent framework' with a comprehensive guide."
+vertical: seo_article
+artifact_kind: article
+threshold: 0.55
+max_iterations: 6
+persona_count: 6
+seed: 23
+
+evals:
+  - {id: seo_title, prompt: "Does the title contain the primary keyword?", check_kind: regex,
+     config: {field: "fields.title", require: [ai, agent, framework]}, weight: 0.2}
+  - {id: seo_outline, prompt: "Are there 3+ H2 sections?", check_kind: length,
+     config: {field: "fields.outline", min: 20, max: 4000}, weight: 0.2}
+  - {id: seo_keywords, prompt: "Does keyword_coverage clear 0.5?", check_kind: range,
+     config: {metric: keyword_coverage, op: ">=", value: 0.5}, weight: 0.3}
+  - {id: seo_dwell, prompt: "Does dwell_estimate clear 0.45?", check_kind: range,
+     config: {metric: dwell_estimate, op: ">=", value: 0.45}, weight: 0.3}
+
+scene:
+  keyword: "best AI agent framework"

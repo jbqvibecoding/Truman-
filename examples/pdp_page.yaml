@@ -1,0 +1,23 @@
+# PDPVertical — ecommerce product detail page (PRD §2 G).
+
+goal: "Optimize the PDP for a noise-cancelling travel headphones product."
+vertical: pdp_page
+artifact_kind: pdp
+threshold: 0.55
+max_iterations: 6
+persona_count: 5
+seed: 41
+
+evals:
+  - {id: pdp_title_specific, prompt: "Is the title >= 30 chars (specific)?", check_kind: length,
+     config: {field: "fields.title", min: 30, max: 150}, weight: 0.2}
+  - {id: pdp_bullets, prompt: "Are there 3+ bullets?", check_kind: length,
+     config: {field: "fields.bullets", min: 20, max: 4000}, weight: 0.2}
+  - {id: pdp_value, prompt: "Does value_clarity clear 0.5?", check_kind: range,
+     config: {metric: value_clarity, op: ">=", value: 0.5}, weight: 0.3}
+  - {id: pdp_trust, prompt: "Does trust_signals clear 0.4?", check_kind: range,
+     config: {metric: trust_signals, op: ">=", value: 0.4}, weight: 0.3}
+
+scene:
+  product: "noise-cancelling travel headphones"
+  category: "electronics"

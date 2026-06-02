@@ -1,0 +1,24 @@
+# SoftwareEngVertical — auto-merge-ready code patch (PRD §2 A).
+# Run: python -m truman run examples/software_eng_issue.yaml
+
+goal: "Fix the null-input crash in src/fix.py — ensure the public API never raises NoneType errors."
+vertical: software_eng
+artifact_kind: code_patch
+threshold: 0.85
+max_iterations: 7
+persona_count: 5
+seed: 1
+
+# 5-dimension weighted grader from PRD §2.2 row A
+# (correctness 35 / tests 25 / quality 20 / security 10 / performance 10)
+criteria:
+  - {name: correctness, metric: correctness, weight: 0.35}
+  - {name: tests,       metric: tests,       weight: 0.25}
+  - {name: quality,     metric: quality,     weight: 0.20}
+  - {name: security,    metric: security,    weight: 0.10}
+  - {name: performance, metric: performance, weight: 0.10}
+
+scene:
+  repo: "example-repo"
+  issue_title: "fix null input crash"
+  cohort: developer_personas

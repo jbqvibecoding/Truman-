@@ -100,11 +100,14 @@ class TrumanEngine:
 
         ledger = Ledger()
         artifact = self._worker.create(goal, brief, plan)
-        artifact_history: list[CandidateArtifact] = [artifact]
+        artifact_history: list[CandidateArtifact] = []
         verdict: JudgeVerdict | None = None
         best = -1.0
 
         for _ in range(goal.max_iterations):
+            # Log the artifact USED this iteration (keeps history parallel
+            # to ledger.records even if the loop ends without delivering).
+            artifact_history.append(artifact)
             result = await self._runner.run(goal, artifact, personas)
             # v2: if binary evals are configured, run them and populate the
             # result so the scorer takes the binary path.
@@ -142,7 +145,6 @@ class TrumanEngine:
             if _budget_exhausted(goal, ledger) or _plateau_hit(goal, ledger):
                 break
             artifact = self._worker.revise(goal, brief, plan, artifact, verdict)
-            artifact_history.append(artifact)
 
         assert verdict is not None  # max_iterations >= 1 guaranteed by schema
         return RunResult(

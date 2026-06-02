@@ -1,0 +1,18 @@
+# ViralContentVertical — short-form social post (PRD §2 C).
+
+goal: "Write a viral X/Twitter post about why most AI agents fail in production."
+vertical: viral_content
+artifact_kind: social_post
+threshold: 0.55
+max_iterations: 6
+persona_count: 6
+seed: 7
+
+evals:
+  - {id: vc_hook_len, prompt: "Is the hook ≤ 200 chars?", check_kind: length, config: {field: "fields.hook", min: 1, max: 200}, weight: 0.2}
+  - {id: vc_share, prompt: "Does the simulated share_rate clear 0.35?", check_kind: range, config: {metric: share_rate, op: ">=", value: 0.35}, weight: 0.4}
+  - {id: vc_remix, prompt: "Does the simulated remix_rate clear 0.3?", check_kind: range, config: {metric: remix_rate, op: ">=", value: 0.3}, weight: 0.4}
+
+scene:
+  topic: "production AI agents"
+  platform: "twitter"

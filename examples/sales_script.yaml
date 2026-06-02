@@ -1,0 +1,21 @@
+# SalesScriptVertical — B2B sales script optimized for meeting conversion (PRD §2 E).
+
+goal: "Sales script for a discovery call with the VP of Engineering at a B2B SaaS."
+vertical: sales_script
+artifact_kind: sales_script
+threshold: 0.55
+max_iterations: 6
+persona_count: 4
+seed: 29
+
+evals:
+  - {id: ss_pain, prompt: "Does pain_dx mention a specific concrete pain?", check_kind: length,
+     config: {field: "fields.pain_dx", min: 20, max: 500}, weight: 0.25}
+  - {id: ss_cta_clear, prompt: "Is the CTA short and specific?", check_kind: length,
+     config: {field: "fields.cta", min: 5, max: 200}, weight: 0.25}
+  - {id: ss_recognition, prompt: "Does pain_recognition clear 0.5?", check_kind: range,
+     config: {metric: pain_recognition, op: ">=", value: 0.5}, weight: 0.5}
+
+scene:
+  product: "AI observability"
+  buyer_industry: "B2B SaaS"

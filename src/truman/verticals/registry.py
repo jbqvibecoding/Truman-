@@ -28,11 +28,28 @@ def available() -> list[str]:
 
 
 def _bootstrap() -> None:
+    # Each new vertical is one import + one register() call.
     from truman.verticals.ad_creative import AdCreativeVertical
+    from truman.verticals.cold_email import ColdEmailVertical
     from truman.verticals.headline import HeadlineVertical
+    from truman.verticals.landing_page import LandingPageVertical
+    from truman.verticals.pdp_page import PDPVertical
+    from truman.verticals.prd_doc import PRDVertical
+    from truman.verticals.sales_script import SalesScriptVertical
+    from truman.verticals.seo_article import SEOVertical
+    from truman.verticals.software_eng import SoftwareEngVertical
+    from truman.verticals.viral_content import ViralContentVertical
 
     register(HeadlineVertical())
     register(AdCreativeVertical())
+    register(SoftwareEngVertical())
+    register(ViralContentVertical())
+    register(LandingPageVertical())
+    register(ColdEmailVertical())
+    register(SEOVertical())
+    register(SalesScriptVertical())
+    register(PRDVertical())
+    register(PDPVertical())
 
 
 _bootstrap()

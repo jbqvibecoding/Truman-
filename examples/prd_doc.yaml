@@ -1,0 +1,22 @@
+# PRDVertical — internal PRD doc optimized for clarity (PRD §2 F).
+
+goal: "PRD for our new AI agent template marketplace feature."
+vertical: prd_doc
+artifact_kind: prd
+threshold: 0.55
+max_iterations: 6
+persona_count: 4
+seed: 37
+
+evals:
+  - {id: prd_stories, prompt: "Are there at least 2 user stories?", check_kind: length,
+     config: {field: "fields.user_stories", min: 20, max: 4000}, weight: 0.2}
+  - {id: prd_criteria, prompt: "Are there 2+ acceptance criteria?", check_kind: length,
+     config: {field: "fields.acceptance_criteria", min: 20, max: 4000}, weight: 0.2}
+  - {id: prd_clarity, prompt: "Does clarity clear 0.5?", check_kind: range,
+     config: {metric: clarity, op: ">=", value: 0.5}, weight: 0.3}
+  - {id: prd_coverage, prompt: "Does coverage clear 0.4?", check_kind: range,
+     config: {metric: coverage, op: ">=", value: 0.4}, weight: 0.3}
+
+scene:
+  feature: "agent template marketplace"

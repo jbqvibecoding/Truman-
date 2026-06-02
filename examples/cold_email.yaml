@@ -1,0 +1,23 @@
+# ColdEmailVertical — outbound email subject + body (PRD §2 D / E).
+
+goal: "Cold email to engineering leaders introducing our AI observability platform."
+vertical: cold_email
+artifact_kind: email
+threshold: 0.55
+max_iterations: 6
+persona_count: 5
+seed: 17
+
+evals:
+  - {id: ce_subject_len, prompt: "Is the subject between 20 and 70 chars?", check_kind: length,
+     config: {field: "fields.subject", min: 20, max: 70}, weight: 0.2}
+  - {id: ce_no_buzz, prompt: "Does the body avoid filler [game-changer, synergy, leverage]?",
+     check_kind: regex, config: {field: "fields.body", forbid: [game-changer, synergy, leverage]}, weight: 0.2}
+  - {id: ce_open, prompt: "Does open_rate clear 0.5?", check_kind: range,
+     config: {metric: open_rate, op: ">=", value: 0.5}, weight: 0.3}
+  - {id: ce_reply, prompt: "Does reply_rate clear 0.35?", check_kind: range,
+     config: {metric: reply_rate, op: ">=", value: 0.35}, weight: 0.3}
+
+scene:
+  product: "AI observability"
+  buyer_industry: "B2B SaaS"
