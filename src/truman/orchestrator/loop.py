@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 
 from truman.agents.base import CandidateArtifact
 from truman.agents.planner import Planner
+from truman.eval.runner import EvalRunner
 from truman.goal.schema import GoalConfig
 from truman.judge.scorer import EngagementScorer
 from truman.judge.verdict import JudgeVerdict
@@ -44,6 +45,29 @@ class RunResult:
         return self.final_verdict.threshold_met
 
 
+def _budget_exhausted(goal: GoalConfig, ledger: Ledger) -> bool:
+    """Stop when cumulative cost crosses the user's token budget (None = off)."""
+    if goal.budget_tokens is None:
+        return False
+    return ledger.cumulative_cost() >= goal.budget_tokens
+
+
+def _plateau_hit(goal: GoalConfig, ledger: Ledger) -> bool:
+    """Stop when no score in the last `plateau_window` rows beat the best earlier.
+
+    None / unset disables. Requires at least window+1 records to fire — this
+    keeps the first few iterations free to explore.
+    """
+    w = goal.plateau_window
+    if w is None or w <= 0:
+        return False
+    scores = [r.score for r in ledger.records]
+    if len(scores) < w + 1:
+        return False
+    best_before = max(scores[:-w])
+    return max(scores[-w:]) <= best_before
+
+
 class TrumanEngine:
     def __init__(self, goal: GoalConfig, mode: str = "mock", model: str | None = None) -> None:
         self.goal = goal
@@ -60,6 +84,7 @@ class TrumanEngine:
             scene_builder=self._vertical.build_scene,
             metrics_fn=self._vertical.compute_metrics,
         )
+        self._eval_runner = EvalRunner(mode=mode, model=model)
 
     def run_sync(self) -> RunResult:
         return asyncio.run(self.run())
@@ -77,6 +102,12 @@ class TrumanEngine:
 
         for _ in range(goal.max_iterations):
             result = await self._runner.run(goal, artifact, personas)
+            # v2: if binary evals are configured, run them and populate the
+            # result so the scorer takes the binary path.
+            if goal.evals:
+                result.per_eval = await self._eval_runner.run_async(
+                    goal.evals, artifact, result.metrics,
+                )
             verdict = self._scorer.score(goal, result)
 
             if verdict.threshold_met:
@@ -96,10 +127,15 @@ class TrumanEngine:
                     status=status,
                     feedback=verdict.feedback,
                     description=artifact.rationale,
+                    per_eval=dict(result.per_eval),
+                    parent_iteration=artifact.parent_iteration,
                 )
             )
 
             if verdict.threshold_met:
+                break
+            # v2 stop conditions: budget cap or plateau before next revise.
+            if _budget_exhausted(goal, ledger) or _plateau_hit(goal, ledger):
                 break
             artifact = self._worker.revise(goal, brief, plan, artifact, verdict)
 

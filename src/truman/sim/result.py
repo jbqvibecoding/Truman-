@@ -20,3 +20,7 @@ class SimulationResult:
     # authoritative state the DM wrote). Verticals read whatever counters they
     # incremented (e.g. engagement_score, or clicks/dwell_total/sentiment_total).
     artifact_state: dict[str, Any] = field(default_factory=dict)
+    # v2: per-Eval binary results, populated by the orchestrator's EvalRunner
+    # after this simulation completes. Empty when the goal uses the v1
+    # continuous-criteria path.
+    per_eval: dict[str, bool] = field(default_factory=dict)

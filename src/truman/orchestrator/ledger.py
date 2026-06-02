@@ -19,6 +19,10 @@ class IterationRecord:
     status: str  # "kept" | "rejected" | "delivered"
     feedback: str = ""
     description: str = ""
+    # v2 extensions (default-valued for backward compat)
+    per_eval: dict[str, bool] = field(default_factory=dict)
+    cost_tokens: int = 0
+    parent_iteration: int | None = None
 
 
 @dataclass
@@ -32,10 +36,17 @@ class Ledger:
     def best_score(self) -> float:
         return max((r.score for r in self.records), default=0.0)
 
+    def cumulative_cost(self) -> int:
+        return sum(r.cost_tokens for r in self.records)
+
     def to_tsv(self) -> str:
-        header = "iteration\tscore\tthreshold\tstatus\tdescription"
+        # Surface per_eval as a JSON-encoded column so the schema stays stable
+        # across goals with different eval sets (autoresearch results.tsv shape).
+        import json as _json
+        header = "iteration\tscore\tthreshold\tstatus\tcost_tokens\tper_eval\tdescription"
         rows = [
-            f"{r.iteration}\t{r.score:.4f}\t{r.threshold:.4f}\t{r.status}\t{r.description}"
+            f"{r.iteration}\t{r.score:.4f}\t{r.threshold:.4f}\t{r.status}\t"
+            f"{r.cost_tokens}\t{_json.dumps(r.per_eval, ensure_ascii=False)}\t{r.description}"
             for r in self.records
         ]
         return "\n".join([header, *rows])

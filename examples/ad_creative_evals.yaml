@@ -1,0 +1,61 @@
+# AI ad-creative optimization with v2 BINARY Eval Engine.
+#
+# Demonstrates docs/PRD.md §4.2 (Eval Engine) + docs/eval-guide.md golden rule:
+# each Eval is a yes/no question, 3-6 evals, independent, observable.
+# Continuous CTR/dwell/sentiment metrics are still computed by the simulator
+# and wrapped as `check_kind: range` binary checks ("clears threshold X?").
+#
+# Run:  python -m truman run examples/ad_creative_evals.yaml
+
+goal: "Maximize CTR/ROAS for our budget travel app's short-form video ad — v2 binary evals."
+vertical: ad_creative
+artifact_kind: ad_creative
+threshold: 0.6
+max_iterations: 6
+persona_count: 6
+seed: 42
+
+# Six binary Evals. Weights sum to 1.0 (any non-zero sum works — the scorer
+# normalizes). Mix of content-layer checks (length / regex / llm_judge) and
+# simulated-outcome checks (range over simulator metrics).
+evals:
+  - id: ad_hook_short
+    prompt: "Is the hook 12 words or fewer (so it fits the first 2 seconds)?"
+    check_kind: length
+    config: {field: "fields.hook", min: 1, max: 80}
+    weight: 0.2
+
+  - id: ad_cta_present
+    prompt: "Does the script mention a clear call-to-action verb (try/buy/get/download/sign up/learn)?"
+    check_kind: regex
+    config: {field: "fields.script", require: [try, buy, get, download, sign up, learn]}
+    weight: 0.15
+
+  - id: ad_no_filler
+    prompt: "Does the creative avoid filler ['game-changer', \"here's the kicker\"]?"
+    check_kind: regex
+    config: {field: "content", forbid: ["game-changer", "here's the kicker"]}
+    weight: 0.1
+
+  - id: ad_specific
+    prompt: "Does the title contain a number or a concrete benefit phrase?"
+    check_kind: llm_judge
+    config: {field: "fields.title"}
+    weight: 0.2
+
+  - id: ad_ctr
+    prompt: "Does the simulated CTR clear 0.6?"
+    check_kind: range
+    config: {metric: ctr, op: ">=", value: 0.6}
+    weight: 0.2
+
+  - id: ad_sentiment
+    prompt: "Does the simulated sentiment_ratio clear 0.5?"
+    check_kind: range
+    config: {metric: sentiment_ratio, op: ">=", value: 0.5}
+    weight: 0.15
+
+scene:
+  product: "budget travel"
+  platform: "tiktok"
+  audience_segments: [小红书用户, TikTok用户, 美国宝妈, Web3 Degens, GenZ]
